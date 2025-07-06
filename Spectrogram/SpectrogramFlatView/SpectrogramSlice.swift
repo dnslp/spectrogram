@@ -314,7 +314,7 @@ struct SpectrogramSlice_Previews: PreviewProvider {
                             CGPoint(x: 5000, y: -30),
                             CGPoint(x: 8800, y: -40),
                             CGPoint(x: 8000, y: -10)],
-                         fftMetaData: SpectrogramFFTMetaData()
+                         fftMetaData: SpectrogramFFTMetaData(fftSize: 2048, minFreq: 48.0, maxFreq: 13500.0)
         )
     }
 }
