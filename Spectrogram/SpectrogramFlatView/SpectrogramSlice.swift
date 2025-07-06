@@ -170,7 +170,8 @@ struct SpectrogramSlice: View, Identifiable {
                 size: CGSize(width: sliceWidth, height: cellHeight))
             cumulativePosition += cellHeight
             allRects.append(thisRect)
-            allColors.append(Color(SpectrogramFlatView.gradientUIColors.intermediate(mappedCells[index].width))  )
+            // Use the instance member `gradientUIColors` instead of the static one
+            allColors.append(Color(self.gradientUIColors.intermediate(mappedCells[index].width))  )
         }
         if cumulativePosition > sliceHeight {
             // print("Warning: all cells sum up higher than what could fit: " +

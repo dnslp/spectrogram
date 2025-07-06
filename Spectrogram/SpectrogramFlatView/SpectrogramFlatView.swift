@@ -93,48 +93,186 @@ import SwiftUI
 
 public struct SpectrogramFlatView: View {
     // this static var is a shortcut: better to have this in SpectrogramModel or SpectrogramFFTMetaData
-    public static var gradientUIColors: [UIColor] =  [(#colorLiteral(red: 0, green: 0, blue: 0, alpha: 0)), (#colorLiteral(red: 0.1411764771, green: 0.3960784376, blue: 0.5647059083, alpha: 0.6275583187)), (#colorLiteral(red: 0.4217140079, green: 0.6851614118, blue: 0.9599093795, alpha: 0.8245213468)), (#colorLiteral(red: 0.8122602105, green: 0.6033009887, blue: 0.8759307861, alpha: 1)), (#colorLiteral(red: 0.9826132655, green: 0.5594901443, blue: 0.4263145328, alpha: 1)), (#colorLiteral(red: 1, green: 0.2607713342, blue: 0.4242972136, alpha: 1))]
-    @StateObject var spectrogram = SpectrogramFlatModel()
+    // For customization, we will move this to be an instance variable, configurable from the UI.
+    // public static var gradientUIColors: [UIColor] =  [(#colorLiteral(red: 0, green: 0, blue: 0, alpha: 0)), (#colorLiteral(red: 0.1411764771, green: 0.3960784376, blue: 0.5647059083, alpha: 0.6275583187)), (#colorLiteral(red: 0.4217140079, green: 0.6851614118, blue: 0.9599093795, alpha: 0.8245213468)), (#colorLiteral(red: 0.8122602105, green: 0.6033009887, blue: 0.8759307861, alpha: 1)), (#colorLiteral(red: 0.9826132655, green: 0.5594901443, blue: 0.4263145328, alpha: 1)), (#colorLiteral(red: 1, green: 0.2607713342, blue: 0.4242972136, alpha: 1))]
+
+    @StateObject var spectrogram: SpectrogramFlatModel
     let node: Node
     let backgroundColor: Color
 
+    // Customizable parameters
+    @State var fftSize: UInt32 = 2048
+    @State var minFreq: CGFloat = 48.0
+    @State var maxFreq: CGFloat = 13500.0
+    @State var gradientColors: [Color] = [
+        Color(red: 0, green: 0, blue: 0, opacity: 0),
+        Color(red: 0.1411764771, green: 0.3960784376, blue: 0.5647059083, opacity: 0.6275583187),
+        Color(red: 0.4217140079, green: 0.6851614118, blue: 0.9599093795, opacity: 0.8245213468),
+        Color(red: 0.8122602105, green: 0.6033009887, blue: 0.8759307861, opacity: 1),
+        Color(red: 0.9826132655, green: 0.5594901443, blue: 0.4263145328, opacity: 1),
+        Color(red: 1, green: 0.2607713342, blue: 0.4242972136, opacity: 1)
+    ]
+
+    // Store the gradientUIColors to avoid recalculating them on every view update
+    // This will be updated when gradientColors changes.
+    @State private var internalGradientUIColors: [UIColor]
+
     /// put only one color into the array for a monochrome view
     public init(node: Node,
+                initialFftSize: UInt32 = 2048,
+                initialMinFreq: CGFloat = 48.0,
+                initialMaxFreq: CGFloat = 13500.0,
                 amplitudeColors: [Color] = [],
                 backgroundColor: Color = Color.black) {
         self.node = node
-        if amplitudeColors.count > 1 {
-            Self.gradientUIColors = amplitudeColors.map { UIColor($0) }
-        } else if amplitudeColors.count == 1 {
-            Self.gradientUIColors = [UIColor(backgroundColor), UIColor(amplitudeColors[0])]
-        }
         self.backgroundColor = backgroundColor
+
+        // Initialize @State variables from parameters
+        _fftSize = State(initialValue: initialFftSize)
+        _minFreq = State(initialValue: initialMinFreq)
+        _maxFreq = State(initialValue: initialMaxFreq)
+
+        let initialGradient: [Color]
+        if !amplitudeColors.isEmpty {
+            initialGradient = amplitudeColors
+        } else {
+            // Default gradient if not provided
+            initialGradient = [
+                Color(red: 0, green: 0, blue: 0, opacity: 0),
+                Color(red: 0.1411764771, green: 0.3960784376, blue: 0.5647059083, opacity: 0.6275583187),
+                Color(red: 0.4217140079, green: 0.6851614118, blue: 0.9599093795, opacity: 0.8245213468),
+                Color(red: 0.8122602105, green: 0.6033009887, blue: 0.8759307861, opacity: 1),
+                Color(red: 0.9826132655, green: 0.5594901443, blue: 0.4263145328, opacity: 1),
+                Color(red: 1, green: 0.2607713342, blue: 0.4242972136, opacity: 1)
+            ]
+        }
+        _gradientColors = State(initialValue: initialGradient)
+
+        // Initialize internalGradientUIColors
+        let uiColors = initialGradient.map { UIColor($0) }
+        _internalGradientUIColors = State(initialValue: uiColors)
+
+        // Initialize the SpectrogramFlatModel with the initial parameters
+        _spectrogram = StateObject(wrappedValue: SpectrogramFlatModel(
+            initialFftSize: initialFftSize,
+            initialMinFreq: initialMinFreq,
+            initialMaxFreq: initialMaxFreq,
+            initialGradientUIColors: uiColors
+        ))
     }
 
     public var body: some View {
-        return GeometryReader { geometry in
-            ZStack {
-                backgroundColor
-                    .onAppear {
-                        spectrogram.updateNode(node)
+        // The UI controls will be added here in a later step
+        VStack { // Parent VStack for Spectrogram and controls
+            GeometryReader { geometry in
+                ZStack {
+                    backgroundColor
+                        .onAppear {
+                            // Pass the node to the model once it's available
+                            spectrogram.updateNode(node)
+                        }
+                    HStack(spacing: 0.0) {
+                        ForEach(spectrogram.slices.items) { slice in
+                            slice
+                        }
+                        // flip it so the new slices come in right and move to the left
+                        .scaleEffect(x: -1, y: 1)
                     }
-                HStack(spacing: 0.0) {
-                    ForEach(spectrogram.slices.items) { slice in
-                        slice
-                    }
-                    // flip it so the new slices come in right and move to the left
-                    .scaleEffect(x: -1, y: 1)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                }.onAppear {
+                    spectrogram.sliceSize = calcSliceSize(fromFrameSize: geometry.size)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-            }.onAppear {
-                spectrogram.sliceSize = calcSliceSize(fromFrameSize: geometry.size)
+                .onChange(of: geometry.size) { newSize  in
+                    spectrogram.sliceSize = calcSliceSize(fromFrameSize: newSize)
+                }
             }
-            .onChange(of: geometry.size) { newSize  in
-                spectrogram.sliceSize = calcSliceSize(fromFrameSize: newSize)
+            .onChange(of: fftSize) { newValue in
+                spectrogram.updateFFTParameters(newFftSize: newValue, newMinFreq: minFreq, newMaxFreq: maxFreq)
             }
+            .onChange(of: minFreq) { newValue in
+                spectrogram.updateFFTParameters(newFftSize: fftSize, newMinFreq: newValue, newMaxFreq: maxFreq)
+            }
+            .onChange(of: maxFreq) { newValue in
+                spectrogram.updateFFTParameters(newFftSize: fftSize, newMinFreq: minFreq, newMaxFreq: newValue)
+            }
+            .onChange(of: gradientColors) { newColors in
+                let newUIColors = newColors.map { UIColor($0) }
+                internalGradientUIColors = newUIColors // Update the @State variable
+                spectrogram.updateGradientColors(newGradientUIColors: newUIColors)
+            }
+
+            // UI Controls
+            Form {
+                Section(header: Text("FFT Settings")) {
+                    Picker("FFT Size", selection: $fftSize) {
+                        Text("1024").tag(UInt32(1024))
+                        Text("2048").tag(UInt32(2048))
+                        Text("4096").tag(UInt32(4096))
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+
+                    VStack {
+                        Text("Min Frequency: \(minFreq, specifier: "%.0f") Hz")
+                        Slider(value: $minFreq, in: 20...maxFreq-100, step: 10) {
+                            Text("Min Frequency")
+                        }
+                    }
+
+                    VStack {
+                        Text("Max Frequency: \(maxFreq, specifier: "%.0f") Hz")
+                        Slider(value: $maxFreq, in: minFreq+100...22000, step: 100) {
+                            Text("Max Frequency")
+                        }
+                    }
+                }
+
+                Section(header: Text("Gradient Colors")) {
+                    List {
+                        ForEach(gradientColors.indices, id: \.self) { index in
+                            HStack {
+                                ColorPicker("Color \(index + 1)", selection: $gradientColors[index], supportsOpacity: true)
+                                Spacer()
+                                Button(action: {
+                                    if gradientColors.count > 1 { // Keep at least one color
+                                        gradientColors.remove(at: index)
+                                    }
+                                }) {
+                                    Image(systemName: "trash")
+                                }
+                                .disabled(gradientColors.count <= 1) // Prevent deleting the last color
+                            }
+                        }
+                        .onDelete(perform: { indexSet in
+                            // Ensure we don't delete if it leaves less than 1 color
+                            if gradientColors.count - indexSet.count >= 1 {
+                                gradientColors.remove(atOffsets: indexSet)
+                            } else if gradientColors.count > 0 && indexSet.contains(0) && gradientColors.count == indexSet.count {
+                                // If trying to delete all, and there was at least one, leave one (e.g. the first one if possible or a default)
+                                // This case is mostly handled by the button disabling, but good for swipe-to-delete
+                                print("Cannot delete all gradient colors.")
+                            }
+                        })
+                    }
+
+                    HStack {
+                        ColorPicker("New Color", selection: $newColorCandidate, supportsOpacity: true)
+                        Button("Add Color") {
+                            gradientColors.append(newColorCandidate)
+                            // Optionally reset newColorCandidate to a default for the next add
+                            // newColorCandidate = Color.white
+                        }
+                    }
+                }
+            }
+            // Adjust height dynamically or remove fixed height if Form content is large
+            // .frame(height: 250)
+        }
+        .onAppear {
+            // Initialize newColorCandidate. Using the last color of the gradient or white.
+            newColorCandidate = gradientColors.last ?? Color.white
         }
     }
-
+    @State private var newColorCandidate: Color = Color.white // For the "Add New Color" picker
     func calcSliceSize(fromFrameSize frameSize: CGSize) -> CGSize {
         let outSize = CGSize(
             // even when we have non-integral width for a slice, the
@@ -143,7 +281,7 @@ public struct SpectrogramFlatView: View {
             // that's why we ceil/floor it: ceiling makes them a bit more precise. 
             // floor makes it more energy efficient. 
             // We did some measurements, it's hard to tell visually
-            width: floor(frameSize.width / CGFloat(spectrogram.slices.maxItems)),
+            width: floor(frameSize.width / CGFloat(spectrogram.slices.maxItems)), // slices.maxItems might need to be dynamic or from model
             height: frameSize.height
         )
         return outSize
@@ -154,6 +292,7 @@ public struct SpectrogramFlatView: View {
 
 struct SpectrogramFlatView_Previews: PreviewProvider {
     static var previews: some View {
+        // Node can be a simple Mixer for preview purposes
         return SpectrogramFlatView(node: Mixer())
     }
 }

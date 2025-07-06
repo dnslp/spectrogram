@@ -49,7 +49,12 @@ struct ContentView: View {
     @StateObject private var conductor = SpectrogramConductor()
 
     var body: some View {
-        SpectrogramFlatView(node: conductor.mixer)
+        SpectrogramFlatView(node: conductor.mixer,
+                            initialFftSize: 2048,      // Default FFT size
+                            initialMinFreq: 48.0,      // Default Min Frequency
+                            initialMaxFreq: 13500.0,   // Default Max Frequency
+                            amplitudeColors: [],       // Use default gradient, or specify an array of Colors
+                            backgroundColor: .black)   // Default background color
             .padding()
             // No need to reconfigure onAppear; the init already did it.
     }
