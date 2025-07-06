@@ -117,6 +117,8 @@ public struct SpectrogramFlatView: View {
     // This will be updated when gradientColors changes.
     @State private var internalGradientUIColors: [UIColor]
 
+    private let frequencyAxisWidth: CGFloat = 60 // Width for the frequency labels
+
     /// put only one color into the array for a monochrome view
     public init(node: Node,
                 initialFftSize: UInt32 = 2048,
@@ -165,25 +167,42 @@ public struct SpectrogramFlatView: View {
         // The UI controls will be added here in a later step
         VStack { // Parent VStack for Spectrogram and controls
             GeometryReader { geometry in
-                ZStack {
-                    backgroundColor
-                        .onAppear {
-                            // Pass the node to the model once it's available
-                            spectrogram.updateNode(node)
+                HStack(spacing: 0) { // Parent HStack for Spectrogram content + Axis View
+                    // ZStack for the main spectrogram content
+                    ZStack {
+                        backgroundColor
+                            .onAppear {
+                                // Pass the node to the model once it's available
+                                spectrogram.updateNode(node)
+                            }
+                        HStack(spacing: 0.0) {
+                            ForEach(spectrogram.slices.items) { slice in
+                                slice
+                            }
+                            // flip it so the new slices come in right and move to the left
+                            .scaleEffect(x: -1, y: 1)
                         }
-                    HStack(spacing: 0.0) {
-                        ForEach(spectrogram.slices.items) { slice in
-                            slice
-                        }
-                        // flip it so the new slices come in right and move to the left
-                        .scaleEffect(x: -1, y: 1)
+                        // The frame for slices should be the geometry width MINUS the axis width
+                        .frame(width: max(0, geometry.size.width - frequencyAxisWidth), height: geometry.size.height, alignment: .trailing)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                }.onAppear {
-                    spectrogram.sliceSize = calcSliceSize(fromFrameSize: geometry.size)
-                }
-                .onChange(of: geometry.size) { newSize  in
-                    spectrogram.sliceSize = calcSliceSize(fromFrameSize: newSize)
+                    // The ZStack containing slices takes up remaining width
+                    .frame(width: max(0, geometry.size.width - frequencyAxisWidth))
+                    .onAppear {
+                        // Calculate slice size based on the width available for the spectrogram part
+                        let availableWidthForSlices = max(0, geometry.size.width - frequencyAxisWidth)
+                        spectrogram.sliceSize = calcSliceSize(availableWidth: availableWidthForSlices, totalHeight: geometry.size.height)
+                    }
+                    .onChange(of: geometry.size) { newSize  in
+                        let availableWidthForSlices = max(0, newSize.width - frequencyAxisWidth)
+                        spectrogram.sliceSize = calcSliceSize(availableWidth: availableWidthForSlices, totalHeight: newSize.height)
+                    }
+
+                    // Frequency Axis View
+                    if geometry.size.width > frequencyAxisWidth { // Only show axis if there's space
+                        FrequencyAxisView(minFreq: minFreq, maxFreq: maxFreq, height: geometry.size.height)
+                            .frame(width: frequencyAxisWidth, height: geometry.size.height)
+                            .clipped()
+                    }
                 }
             }
             .onChange(of: fftSize) { newValue in
@@ -273,16 +292,12 @@ public struct SpectrogramFlatView: View {
         }
     }
     @State private var newColorCandidate: Color = Color.white // For the "Add New Color" picker
-    func calcSliceSize(fromFrameSize frameSize: CGSize) -> CGSize {
+
+    // Updated to consider the width available after allocating space for the frequency axis
+    func calcSliceSize(availableWidth: CGFloat, totalHeight: CGFloat) -> CGSize {
         let outSize = CGSize(
-            // even when we have non-integral width for a slice, the
-            // resulting image will be integral in size but resizable
-            // the HStack will then layout them not pixel aligned and stretched.
-            // that's why we ceil/floor it: ceiling makes them a bit more precise. 
-            // floor makes it more energy efficient. 
-            // We did some measurements, it's hard to tell visually
-            width: floor(frameSize.width / CGFloat(spectrogram.slices.maxItems)), // slices.maxItems might need to be dynamic or from model
-            height: frameSize.height
+            width: floor(availableWidth / CGFloat(spectrogram.slices.maxItems)),
+            height: totalHeight
         )
         return outSize
     }
