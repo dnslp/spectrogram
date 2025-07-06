@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		BE3C69EF2E1AF23C00D82B90 /* AudioKit in Frameworks */ = {isa = PBXBuildFile; productRef = BE3C69EE2E1AF23C00D82B90 /* AudioKit */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		BE3C69C62E1AF21700D82B90 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BE3C69EF2E1AF23C00D82B90 /* AudioKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +117,7 @@
 			);
 			name = Spectrogram;
 			packageProductDependencies = (
+				BE3C69EE2E1AF23C00D82B90 /* AudioKit */,
 			);
 			productName = Spectrogram;
 			productReference = BE3C69B52E1AF21500D82B90 /* Spectrogram.app */;
@@ -195,6 +201,9 @@
 			);
 			mainGroup = BE3C69AC2E1AF21500D82B90;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				BE3C69ED2E1AF23C00D82B90 /* XCRemoteSwiftPackageReference "AudioKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BE3C69B62E1AF21500D82B90 /* Products */;
 			projectDirPath = "";
@@ -399,6 +408,7 @@
 				DEVELOPMENT_TEAM = PFGM5X4HD6;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need your mic";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -428,6 +438,7 @@
 				DEVELOPMENT_TEAM = PFGM5X4HD6;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need your mic";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -558,6 +569,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		BE3C69ED2E1AF23C00D82B90 /* XCRemoteSwiftPackageReference "AudioKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/AudioKit/AudioKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.6.5;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		BE3C69EE2E1AF23C00D82B90 /* AudioKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BE3C69ED2E1AF23C00D82B90 /* XCRemoteSwiftPackageReference "AudioKit" */;
+			productName = AudioKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = BE3C69AD2E1AF21500D82B90 /* Project object */;
 }

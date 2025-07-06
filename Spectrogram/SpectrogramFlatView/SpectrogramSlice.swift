@@ -4,16 +4,16 @@
 
 import SwiftUI
 
-/// One slice with frequencies from low frequencies at the bottom up to high frequences. 
-/// Amplitudes shown in different colors according to the submitted gradient 
-/// Resulting image has an integral size (dimensions in Int), so they are most of 
-/// the time a bit smaller than requested. This is because they are drawn in 
-/// a CGContext that doesn't have fractions of pixels to draw.  
+/// One slice with frequencies from low frequencies at the bottom up to high frequences.
+/// Amplitudes shown in different colors according to the submitted gradient
+/// Resulting image has an integral size (dimensions in Int), so they are most of
+/// the time a bit smaller than requested. This is because they are drawn in
+/// a CGContext that doesn't have fractions of pixels to draw.
 struct SpectrogramSlice: View, Identifiable {
     static var counterSinceStart = 0
-    // static Int instead of a UUID as identifier. While debugging it's practical 
+    // static Int instead of a UUID as identifier. While debugging it's practical
     // to see the order and therefore time the slice was created.
-    // Furthermore for the sake of premature performance optimisation: 
+    // Furthermore for the sake of premature performance optimisation:
     // Incrementing an Int could be supposedly faster than creating UUID.
     // depending on the version of swiftlint, this will be marked as rule violation to be 2 characters in length
     // swiftlint:disable identifier_name
@@ -25,6 +25,9 @@ struct SpectrogramSlice: View, Identifiable {
     let sliceHeight: CGFloat
     let rawFftReadings: [Float]
     let fftMetaData: SpectrogramFFTMetaData
+    let chakraFrequencies: [ChakraFrequency] // Added property for chakra frequencies
+    
+
     // they don't contain CGPoints in the sense of graphic but in the sense of vectors.
     // x describing the frequency axis and y the amplitude axis.
     private var fftReadingFrequencyAmplitudePairs: [CGPoint]
@@ -37,13 +40,15 @@ struct SpectrogramSlice: View, Identifiable {
         sliceWidth: CGFloat,
         sliceHeight: CGFloat,
         fftReadings: [Float],
-        fftMetaData: SpectrogramFFTMetaData
+        fftMetaData: SpectrogramFFTMetaData,
+        chakraFrequencies: [ChakraFrequency] = ChakraFrequencies.all // Added parameter with default
     ) {
         self.gradientUIColors = gradientUIColors
         self.sliceWidth = sliceWidth
         self.sliceHeight = sliceHeight
         self.rawFftReadings = fftReadings
         self.fftMetaData = fftMetaData
+        self.chakraFrequencies = chakraFrequencies // Initialize new property
         Self.counterSinceStart = Self.counterSinceStart &+ 1
         id = Self.counterSinceStart
         allRects = []
@@ -62,19 +67,21 @@ struct SpectrogramSlice: View, Identifiable {
         allColors = []
     }
 
-    /// convenience initialiser, useful when measurements are created manually 
+    /// convenience initialiser, useful when measurements are created manually
     init(
         gradientUIColors: [UIColor],
         sliceWidth: CGFloat,
         sliceHeight: CGFloat,
         fftReadingsFrequencyAmplitudePairs: [CGPoint],
-        fftMetaData: SpectrogramFFTMetaData
+        fftMetaData: SpectrogramFFTMetaData,
+        chakraFrequencies: [ChakraFrequency] = ChakraFrequencies.all // Added parameter with default
     ) {
         self.gradientUIColors = gradientUIColors
         self.sliceWidth = sliceWidth
         self.sliceHeight = sliceHeight
         self.fftReadingFrequencyAmplitudePairs = fftReadingsFrequencyAmplitudePairs
         self.fftMetaData = fftMetaData
+        self.chakraFrequencies = chakraFrequencies // Initialize new property
         Self.counterSinceStart = Self.counterSinceStart &+ 1
         id = Self.counterSinceStart
         allRects = []
@@ -92,25 +99,44 @@ struct SpectrogramSlice: View, Identifiable {
             .scaleEffect(x: 1, y: -1)
     }
 
-    // This code draws in the first quadrant, it's much easier to understand 
+    // This code draws in the first quadrant, it's much easier to understand
     // when we can draw from low to high frequency bottom to top.
     // will have to flip the image when using in a typical Spectrogram View
     func createSpectrumImage() -> UIImage {
         // return an empty image when no data here to visualize.
         guard allRects.count > 0 else { return UIImage() }
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: sliceWidth, height: sliceHeight))
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: sliceWidth + 30, height: sliceHeight)) // Increased width for labels
         let img = renderer.image { ctx in
+            // Draw spectrum rectangles
             for index in 0...allRects.count-1 {
                 UIColor(allColors[index]).setFill()
                 ctx.fill(allRects[index])
+            }
+
+            // Draw chakra frequency markers
+            let _: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 8),
+                .foregroundColor: UIColor.white
+            ]
+
+            for chakra in chakraFrequencies {
+                let freqValue = CGFloat(chakra.frequency)
+                let freqRange = CGFloat(fftMetaData.minFreq) ... CGFloat(fftMetaData.maxFreq)
+                let frequencyYPos = freqValue.mappedLog10(
+                    from: freqRange,
+                    to: 0 ... sliceHeight
+                )
+
+                guard frequencyYPos >= 0 && frequencyYPos <= sliceHeight else { continue }
+                // … draw your marker at y = frequencyYPos …
             }
         }
         return img
     }
 
-    // unused method drawing into a Canvas. Might be useful in the future 
-    // when doing more energy efficent drawing. 
-    // MARK: createSpectrumSlice() 
+    // unused method drawing into a Canvas. Might be useful in the future
+    // when doing more energy efficent drawing.
+    // MARK: createSpectrumSlice()
     /* func createSpectrumSlice() -> some View {
         return Canvas { context, _ in
             for index in 0...allRects.count-1 {
@@ -176,7 +202,7 @@ struct SpectrogramSlice: View, Identifiable {
                 // these are the ones typcally smaller than minFreq
                 continue
             }
-            // calc height using the last frequency and ceil it to prevent black lines between measurements. 
+            // calc height using the last frequency and ceil it to prevent black lines between measurements.
             // it may happen that a cell is less than 1.0 high: that shouldn't bother us
             let cellHeight = ceil(frequencyPosition - lastFrequencyPosition)
             lastFrequencyPosition += cellHeight
@@ -187,24 +213,24 @@ struct SpectrogramSlice: View, Identifiable {
         return outCells
     }
 
-    /// Returns frequency, amplitude pairs after removing unwanted data points,  
+    /// Returns frequency, amplitude pairs after removing unwanted data points,
     /// there are simply too many in the high frequencies.
     /// The resulting array has fftSize amount of readings. The incoming array is compiled to CGPoints containing
-    /// frequency and amplitude, where as x is frequency and y amplitude. 
+    /// frequency and amplitude, where as x is frequency and y amplitude.
     /// The amount of pairs depends on minFreq and maxFreq as well as the fftSize.
     /// To understand CGPoint x and y imagine a chart that spans from left to right for lowest to highest frequency
-    /// and on shows vertically the amplitude, as the equalizer view of an 80ies stereo system. 
-    /// The FFT-slices start at frequency 0, which is odd. 
-    /// Lowest frequency meaning amplitude of all frequencies 
-    /// from 0 to the first other frequency (typically 5Hz or 21.533Hz) 
-    /// 
-    /// Alternative implementation: have this array not with CGPoint of frequency and amplitude 
-    /// but only of amplitude already color coded in the gradient. The frequency axis 
+    /// and on shows vertically the amplitude, as the equalizer view of an 80ies stereo system.
+    /// The FFT-slices start at frequency 0, which is odd.
+    /// Lowest frequency meaning amplitude of all frequencies
+    /// from 0 to the first other frequency (typically 5Hz or 21.533Hz)
+    ///
+    /// Alternative implementation: have this array not with CGPoint of frequency and amplitude
+    /// but only of amplitude already color coded in the gradient. The frequency axis
     /// would then be hardcoded as the plot distance on y-axis
     ///
-    /// Improvement: make the filtering of high frequencies dependent of fftSize. 
-    /// The more data, the more filtering is needed.  
-    /// 
+    /// Improvement: make the filtering of high frequencies dependent of fftSize.
+    /// The more data, the more filtering is needed.
+    ///
     /// Make this more energy efficient by combining this function with mapFftReadingsToCells
 
     func captureAmplitudeFrequencyData(_ fftFloats: [Float]) -> [CGPoint] {
@@ -220,7 +246,7 @@ struct SpectrogramSlice: View, Identifiable {
         let filterFrequency = 1000.0
 
         for index in 1 ... (fftFloats.count / 2) {
-            // Compiler or LLVM will make these four following array access' into two 
+            // Compiler or LLVM will make these four following array access' into two
             let real = fftFloats[index-1].isNaN ? 0.0 : fftFloats[index-1]
             let imaginary = fftFloats[index].isNaN ? 0.0 : fftFloats[index]
             let frequencyForBin = fftMetaData.sampleRate * 0.5 * Double(index * 2) / Double(fftFloats.count * 2)
@@ -249,9 +275,9 @@ struct SpectrogramSlice: View, Identifiable {
                 }
             } else if frequencyForBin > filterFrequency {
                 // take the greatest 1 in every 2 points when > 1k Hz.
-                // This might be already too much data, depending on the highest frequency shown 
-                // and the height of where this slice is shown. 
-                // might reduce it to show every 4th point. 
+                // This might be already too much data, depending on the highest frequency shown
+                // and the height of where this slice is shown.
+                // might reduce it to show every 4th point.
                 maxSquared = squared > maxSquared ? squared : maxSquared
                 if index % 2 != 0 { continue
                 } else {
@@ -271,8 +297,8 @@ struct SpectrogramSlice: View, Identifiable {
 @available(iOS 17.0, *)
 struct SpectrogramSlice_Previews: PreviewProvider {
     static var previews: some View {
-        // This shows the wrong behaviour of the slice: the lowest frequency isn't shown, the 
-        // lowest amplitude below -200 should be black but is white. 
+        // This shows the wrong behaviour of the slice: the lowest frequency isn't shown, the
+        // lowest amplitude below -200 should be black but is white.
         return SpectrogramSlice(gradientUIColors:
                             [(#colorLiteral(red: 0, green: 0, blue: 0, alpha: 1)), (#colorLiteral(red: 0.1411764771, green: 0.3960784376, blue: 0.5647059083, alpha: 1)), (#colorLiteral(red: 0.4217140079, green: 0.6851614118, blue: 0.9599093795, alpha: 1)), (#colorLiteral(red: 0.8122602105, green: 0.6033009887, blue: 0.8759307861, alpha: 1)), (#colorLiteral(red: 0.9826132655, green: 0.5594901443, blue: 0.4263145328, alpha: 1)), (#colorLiteral(red: 1, green: 0.2607713342, blue: 0.4242972136, alpha: 1))],
                          sliceWidth: 40, sliceHeight: 150,
